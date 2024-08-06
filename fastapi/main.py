@@ -1,12 +1,18 @@
-from fastapi import FastAPI, Depends, HTTPException
+import redis.asyncio as redis
+from fastapi import FastAPI, Depends, HTTPException, Request, status
+from fastapi_limiter import FastAPILimiter
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.middleware.cors import CORSMiddleware
 from src.database.db import get_db
-from src.routes import contacts, auth
+from src.routes import contacts, auth, users
+from src.conf.config import config
+from ipaddress import ip_address
+from typing import Callable
+from fastapi.responses import JSONResponse
 
 app = FastAPI()
-origins = ["*"]
+origins = ["http://localhost:3000"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,9 +21,46 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+banned_ips = [
+    ip_address("192.168.1.1"),
+    ip_address("192.168.1.2"),
+]
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(contacts.router, prefix="/api")
+app.include_router(users.router, prefix="/api")
+
+
+@app.middleware("http")
+async def ban_ips(request: Request, call_next: Callable):
+    ip = ip_address(request.client.host)
+    if ip in banned_ips:
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN, content={"detail": "You are banned"}
+        )
+    response = await call_next(request)
+    return response
+
+
+redis_client = None
+
+
+@app.on_event("startup")
+async def startup():
+    global redis_client
+    redis_client = redis.Redis(
+        host=config.REDIS_DOMAIN,
+        port=config.REDIS_PORT,
+        db=0,
+        password=config.REDIS_PASSWORD,
+    )
+    await FastAPILimiter.init(redis_client)
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    if redis_client:
+        await redis_client.close()
 
 
 @app.get("/")

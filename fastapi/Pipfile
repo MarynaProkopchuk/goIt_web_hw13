@@ -15,6 +15,9 @@ passlib = {extras = ["bcrypt"], version = "*"}
 uvicorn = {extras = ["standard"], version = "*"}
 fastapi-mail = "*"
 python-dotenv = "*"
+redis = "*"
+fastapi-limiter = "*"
+cloudinary = "*"
 
 [dev-packages]
 
