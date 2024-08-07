@@ -1,4 +1,3 @@
-
 import cloudinary
 import cloudinary.uploader
 from fastapi import (
@@ -29,6 +28,7 @@ cloudinary.config(
 @router.get("/me/", response_model=UserResponse)
 async def read_users_me(current_user: User = Depends(auth_service.get_current_user)):
     return current_user
+
 
 @router.patch("/avatar", response_model=UserResponse)
 async def update_avatar_user(
